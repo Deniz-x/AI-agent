@@ -13,10 +13,6 @@ max_depth = 3
 
 @register_agent("student_agent")
 class StudentAgent(Agent):
-    """
-    A dummy class for your implementation. Feel free to use this class to
-    add any helper functionalities needed for your agent.
-    """
 
     def __init__(self):
         super(StudentAgent, self).__init__()
@@ -54,28 +50,89 @@ class StudentAgent(Agent):
         start_time = time.time()
 
         r, c = my_pos
+        allowed_moves = {}
         print(f"starting s is {(0,r,c,-1)}")
-        #self.get_successors(allowed_moves, 0, chess_board,my_pos, adv_pos, max_step, -1)
-        next_move = self.max_value((0,r,c,-1), chess_board, float('-inf'), float('inf'), adv_pos, max_step, 0)
-        print(f"next move is {next_move}")
-        heuristic, row, column, dir = next_move
-        next_position = row,column
+        self.get_successors(allowed_moves, 0,chess_board,my_pos, adv_pos, max_step, -1)
+        #self.get_successors((0,r,c,-1), allowed_moves, 0, chess_board, adv_pos, max_step, visited_tiles)
+        print(allowed_moves)
+        allowed_pos_list = list(allowed_moves)
+        print(allowed_pos_list[0])
+        next_r, next_c = allowed_pos_list[0]
+        next_dir = allowed_moves[allowed_pos_list[0]][0]
+        #heapq.heapify(allowed_moves_list)
+        #next_r,next_c, next_dir = heapq.heappop(allowed_moves)
+        #print(next_r,next_c, next_dir)
+
+        #next_move = self.max_value((0,r,c,-1), chess_board, float('-inf'), float('inf'), adv_pos, max_step, 0)
+        #print(f"next move is {next_move}")
+        #heuristic, row, column, dir = next_move
+        #next_position = row,column
 
         time_taken = time.time() - start_time
         
         print("My AI's turn took ", time_taken, "seconds.")
 
         # dummy return
-        return next_position, dir
+        return (next_r, next_c), next_dir
+        #next_position, dir
     
     #my_pos, self.dir_map["u"]
 
     #self.dir_map["u"]
+    def get_successors(self, allowed_moves, i,chess_board,my_pos, adv_pos, max_step, prev_dir):
 
-    def get_successors(self, s, allowed_moves, i,chess_board, adv_pos, max_step):
+        #make sure we don't consider moving back
+        if prev_dir!=-1:
+            prev_dir = self.opposites[prev_dir]
 
-        
+        #stop making moves when reached the max_step
+        if i > max_step:
+            return
+
+        r, c = my_pos
+        to_skip_pos = False
+
+        # Build a list of the moves we can make
+        allowed_dirs = [ d                                
+            for d in range(0,4)                           # 4 moves possible
+            if not chess_board[r,c,d] and                 # chess_board True means wall
+            not adv_pos == (r+self.moves[d][0],c+self.moves[d][1])] # cannot move through Adversary
+
+        if len(allowed_dirs)==0:
+            # If no possible move, we must be enclosed by our Adversary
+            return 
+
+        if len(allowed_dirs)==1 and (i==0 or len(allowed_moves)!=0):
+            # don't add the move that puts you in this position to possible moves dict
+            to_skip_pos = True
+
+        for dir in allowed_dirs:
+            print(f"move is {(r,c)} and dir is {dir}")
+            print(f"allowed_dirs are {allowed_dirs}")
+
+            if not to_skip_pos:
+                # adding the current tile and the possible directions for the wall on the dict of possible moves
+                if (r,c) in allowed_moves:
+                    print("move is already in dict")
+                    if len(allowed_moves[(r,c)]) != len(allowed_dirs):
+                        allowed_moves[(r,c)].append(dir)
+                else:
+                    print("move is not in dict")
+                    allowed_moves[(r,c)] = [dir]
+
+            #actually making the move and recursion for the remaining steps
+            #when making the next move, make sure you're not moving to the direction agent was coming from 
+            if dir!=prev_dir:
+                m_r, m_c = self.moves[dir]
+                next_pos = (r + m_r, c + m_c)
+                self.get_successors(allowed_moves, i+1, chess_board,next_pos, adv_pos, max_step, dir)
+
+    def get_successors2(self, s, allowed_moves, i,chess_board, adv_pos, max_step, visited_tiles):
+
+        #i is the current step
+
         heuristic, r, c, prev_dir = s
+        #visited_tiles.add((r,c))
         
         #make sure we don't consider moving back
         if prev_dir!=-1:
@@ -89,27 +146,29 @@ class StudentAgent(Agent):
         allowed_dirs = [ d                                
             for d in range(0,4)                           # 4 moves possible
             if not chess_board[r,c,d] and                 # chess_board True means wall
-            not adv_pos == (r+moves[d][0],c+moves[d][1]) and
+            not adv_pos == (r+self.moves[d][0],c+self.moves[d][1]) and
             d!=prev_dir] # cannot move through Adversary
         
         
         if len(allowed_dirs)==0:
-            # If no possible move, we must be enclosed by our Adversary
-            return 0
+            # If no possible move after making a move, we must be enclosed by our Adversary don't make that move
+            return 
         
-        if len(allowed_dirs)==1: #&& i!=1:
-            return -1
+        if len(allowed_dirs)==1 and len(allowed_moves)!=0:
+            #maybe add a check if the heap is empty
+            return 
         
         heuristic = np.random.randint(0, len(chess_board))
         
         for dir in allowed_dirs:
-            
+            heapq.heappush(allowed_moves, (-heuristic, r,c,dir))
             #allowed_moves.append((r,c,dir))
-            m_r, m_c = moves[dir]
+            m_r, m_c = self.moves[dir]
             next_s = (heuristic, r + m_r, c + m_c, dir)
-            is_good_move = self.get_successors(next_s, allowed_moves, i+1, chess_board, adv_pos, max_step)
-            if is_good_move != -1:
-                heapq.heappush(allowed_moves, (-heuristic, r,c,dir))
+
+            #if((r + m_r, c + m_c) not in visited_tiles):
+            self.get_successors(next_s, allowed_moves, i+1, chess_board, adv_pos, max_step, visited_tiles)
+            
 
     #def alpha_beta():
 
@@ -120,9 +179,11 @@ class StudentAgent(Agent):
 
         if max_turn_count==max_depth:
             return -s[0],s[1],s[2], s[3]
+        
+        visited_tiles = set()
         max_turn_count +=1 
         allowed_moves = []
-        self.get_successors(s, allowed_moves, 0, chess_board, adv_pos, max_step)
+        self.get_successors(s, allowed_moves, 0, chess_board, adv_pos, max_step, visited_tiles)
 
         print(f"allowed moves are {allowed_moves}")
 
@@ -138,7 +199,8 @@ class StudentAgent(Agent):
     
     def min_value(self, s, chess_board, alpha, beta, adv_pos, max_step, max_turn_count):
         allowed_moves = []
-        self.get_successors(s, allowed_moves, 0, chess_board, adv_pos, max_step)
+        visited_tiles = set()
+        self.get_successors(s, allowed_moves, 0, chess_board, adv_pos, max_step, visited_tiles)
         print("-----------")
         print("in min_value")
         print(f"s is {s}")
@@ -158,7 +220,7 @@ class StudentAgent(Agent):
         move = self.moves[dir]
         chess_board[r + move[0], c + move[1], self.opposites[dir]] = True
 
-     def endgame(self, chess_board, my_pos, adv_pos):
+    def endgame(self, chess_board, my_pos, adv_pos):
         board_size = chess_board.shape[0]
         r,c = my_pos
         # Union-Find
@@ -219,7 +281,6 @@ class StudentAgent(Agent):
     def state_of_game(chess_board):
         remaining_pos = []
         board_size = chess_board.shape[0]
-        moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
 
         for i in range(board_size):
             for j in range(board_size):
@@ -237,10 +298,23 @@ class StudentAgent(Agent):
         else:
             return 3 #end game
 
-    def eval_function(self):
-        self.get_available_move_number()
+    def eval_function(self,chess_board, r, c, max_step, move_number):
+        #where we return the complete heuristic, other defined heuristics should be called here and added to the return value
+        available_move_number = self.get_available_move_number(chess_board, r, c, max_step, move_number)
+        return available_move_number
 
-    #def get_available_move_number(self, chess_board, r, c, max_step, move number):
+    def get_available_move_number(self, chess_board, my_pos, adv_pos, max_step):
+        #returns the number of available complete moves, not the number of available tiles
+        allowed_moves = {}
+
+        self.get_successors(allowed_moves, 0, chess_board, my_pos, adv_pos, max_step, -1)
+        number_of_moves = 0
+
+        for move in allowed_moves:
+            number_of_moves!=len(allowed_moves[move])
+        return number_of_moves
+        
+
         
 
 
