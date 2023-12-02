@@ -26,6 +26,7 @@ class StudentAgent(Agent):
         # Opposite Directions
         self.opposites = {0: 2, 1: 3, 2: 0, 3: 1}
         self.moves = ((-1, 0), (0, 1), (1, 0), (0, -1))
+        self.aggression_heuristic = 2
 
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
@@ -80,6 +81,8 @@ class StudentAgent(Agent):
 
     #self.dir_map["u"]
     def get_successors(self, allowed_moves, i,chess_board,my_pos, adv_pos, max_step, prev_dir):
+        #returns a dictionary that contains available moves in the following format:
+        #valid_position:tuple : valid_dirs_to_place_walls: list
 
         #make sure we don't consider moving back
         if prev_dir!=-1:
@@ -170,7 +173,12 @@ class StudentAgent(Agent):
             self.get_successors(next_s, allowed_moves, i+1, chess_board, adv_pos, max_step, visited_tiles)
             
 
-    #def alpha_beta():
+    def alpha_beta(self, chess_board, my_pos, adv_pos, max_depth):
+
+
+
+        return
+        
 
 
     def max_value(self, s, chess_board, alpha, beta, adv_pos, max_step, max_turn_count):
@@ -301,6 +309,7 @@ class StudentAgent(Agent):
     def eval_function(self,chess_board, r, c, max_step, move_number):
         #where we return the complete heuristic, other defined heuristics should be called here and added to the return value
         available_move_number = self.get_available_move_number(chess_board, r, c, max_step, move_number)
+
         return available_move_number
 
     def get_available_move_number(self, chess_board, my_pos, adv_pos, max_step):
@@ -311,8 +320,29 @@ class StudentAgent(Agent):
         number_of_moves = 0
 
         for move in allowed_moves:
-            number_of_moves!=len(allowed_moves[move])
+            number_of_moves+=len(allowed_moves[move])
+        
         return number_of_moves
+    
+    def is_aggressive_move (self, my_pos, my_dir, adv_pos):
+        my_r, my_c = my_pos
+        adv_r, adv_c = adv_pos
+
+        if (my_r == adv_r+1 and my_c == adv_c and my_dir == 0) or \
+            (my_r == adv_r and my_c == adv_c-1 and my_dir == 1) or \
+            (my_r == adv_r-1 and my_c == adv_c and my_dir == 0) or \
+            (my_r == adv_r+1 and my_c == adv_c and my_dir == 0):
+            return self.aggressive_heuristic
+        
+        return 0
+    
+    def distance_between_agents(my_pos, adv_pos):
+        #the more the distance the less the heuristic value
+        my_r, my_c = my_pos
+        adv_r, adv_c = adv_pos
+
+        return 1/(abs(my_r - adv_r) + abs(my_c - adv_c))
+
         
 
         
