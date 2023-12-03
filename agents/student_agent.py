@@ -49,8 +49,11 @@ class StudentAgent(Agent):
         start_time = time.time()
         r,c = my_pos
 
-        alpha, move = self.alpha_beta((r,c,-1), chess_board, float("-inf"), float("inf"), my_pos, adv_pos, max_step, 3)
+        alpha, move = self.alpha_beta((r,c,-1), chess_board, float("-inf"), float("inf"), my_pos, adv_pos, max_step, 6)
         next_r,next_c, next_dir = move
+
+        if(alpha>=1000):
+            print("found winning move")
 
         time_taken = time.time() - start_time
         
@@ -108,49 +111,7 @@ class StudentAgent(Agent):
                 next_pos = (r + m_r, c + m_c)
                 self.get_successors(allowed_moves, i+1, chess_board,next_pos, adv_pos, max_step, dir)
 
-    def get_successors2(self, s, allowed_moves, i,chess_board, adv_pos, max_step, visited_tiles):
-
-        #i is the current step
-
-        heuristic, r, c, prev_dir = s
-        #visited_tiles.add((r,c))
-        
-        #make sure we don't consider moving back
-        if prev_dir!=-1:
-            prev_dir = self.opposites[prev_dir]
-
-        #stop making moves when reached the max_step
-        if i > max_step:
-            return 0
-
-        # Build a list of the moves we can make
-        allowed_dirs = [ d                                
-            for d in range(0,4)                           # 4 moves possible
-            if not chess_board[r,c,d] and                 # chess_board True means wall
-            not adv_pos == (r+self.moves[d][0],c+self.moves[d][1]) and
-            d!=prev_dir] # cannot move through Adversary
-        
-        
-        if len(allowed_dirs)==0:
-            # If no possible move after making a move, we must be enclosed by our Adversary don't make that move
-            return 
-        
-        if len(allowed_dirs)==1 and len(allowed_moves)!=0:
-            #maybe add a check if the heap is empty
-            return 
-        
-        heuristic = np.random.randint(0, len(chess_board))
-        
-        for dir in allowed_dirs:
-            heapq.heappush(allowed_moves, (-heuristic, r,c,dir))
-            #allowed_moves.append((r,c,dir))
-            m_r, m_c = self.moves[dir]
-            next_s = (heuristic, r + m_r, c + m_c, dir)
-
-            #if((r + m_r, c + m_c) not in visited_tiles):
-            self.get_successors(next_s, allowed_moves, i+1, chess_board, adv_pos, max_step, visited_tiles)
-            
-
+    
     def alpha_beta(self, current_move, chess_board, alpha, beta, my_pos, adv_pos, max_step, max_depth):
         return self.alpha_beta_max(current_move, chess_board, alpha, beta, my_pos, adv_pos, max_step, 0, max_depth)
 
@@ -163,9 +124,9 @@ class StudentAgent(Agent):
         #print("----")
 
         # CUTOFF
-        is_cutoff, score = self.cutoff(curr_move, chess_board, my_pos, adv_pos, max_step, curr_depth, max_depth, False)
+        is_cutoff, score = self.cutoff(curr_move, chess_board, my_pos, adv_pos, max_step, curr_depth, max_depth, True)
         if is_cutoff:
-            return score, None
+            return score, curr_move
         
         copied_chess_board= chess_board
         if curr_depth!=0:
@@ -180,7 +141,7 @@ class StudentAgent(Agent):
         after_get_successor_time = time.time()
         time_taken_get_successpr = after_get_successor_time - before_get_successor_time
         
-        print("get_successor took ", time_taken_get_successpr, "seconds.")
+        #print("get_successor took ", time_taken_get_successpr, "seconds.")
 
         allowed_moves_list = self.dict_to_heap(allowed_moves)
 
@@ -193,10 +154,10 @@ class StudentAgent(Agent):
             alpha = max(alpha, new_alpha)
 
             if alpha >= beta:
-                print("pruned")
+                #print("pruned")
                 return beta, successor
 
-        move_of_the_winning_alpha = None
+        move_of_the_winning_alpha = curr_move
         for move in move_alpha_dict:
             if (move_alpha_dict[move] == alpha):
                 move_of_the_winning_alpha = move
@@ -214,9 +175,9 @@ class StudentAgent(Agent):
         #print("----")
 
         # CUTOFF
-        is_cutoff, score = self.cutoff(curr_move, chess_board, my_pos, adv_pos, max_step, curr_depth, max_depth, True)
+        is_cutoff, score = self.cutoff(curr_move, chess_board, my_pos, adv_pos, max_step, curr_depth, max_depth, False)
         if is_cutoff:
-            return -score, None
+            return score, curr_move
 
         copied_chess_board= chess_board
         if curr_depth!=0:
@@ -239,10 +200,10 @@ class StudentAgent(Agent):
             beta = min(beta, new_beta)
 
             if alpha >= beta:
-                print("pruned")
+                #print("pruned")
                 return alpha, adv_move
         
-        move_of_the_winning_beta = None
+        move_of_the_winning_beta = curr_move
         for move in move_beta_dict:
             if (move_beta_dict[move] == alpha):
                 move_of_the_winning_beta = move
@@ -251,15 +212,30 @@ class StudentAgent(Agent):
         #print("Returning from Min node with move =", move_of_the_winning_beta)
         return beta, move_of_the_winning_beta
     
-    def cutoff(self,curr_move, chess_board, my_pos, adv_pos, max_step, curr_depth, max_depth, is_min):
+    def cutoff(self,curr_move, chess_board, my_pos, adv_pos, max_step, curr_depth, max_depth, is_max):
         #returns a boolean that indicates whether we're at a cutoff and a float indicating our score or the eval function's result
         is_endgame, score = self.endgame(chess_board, my_pos, adv_pos)
+        
+        
         if is_endgame:
-            if not is_min:
-                print(f"winning move found, it's {curr_move}")
+            #print("game ended")
+            #print(f"is_max: {is_max}")
+            #print(curr_move)
+            #print(score)
+            
             return True, score*100
+        
         elif curr_depth == max_depth:
-            return True, self.eval_function(curr_move, chess_board, my_pos, adv_pos, max_step)
+            if is_max:
+                #print(f"is_max: {is_max}")
+                #print(curr_move)
+                #print(-self.eval_function(curr_move, chess_board, my_pos, adv_pos, max_step))
+                return True, -self.eval_function(curr_move, chess_board, my_pos, adv_pos, max_step)
+            else:
+                #print(f"is_max: {is_max}")
+                #print(curr_move)
+                #print(-self.eval_function(curr_move, chess_board, my_pos, adv_pos, max_step))
+                return True, self.eval_function(curr_move, chess_board, my_pos, adv_pos, max_step)
         return False, 0
 
     # Taken from world.py
@@ -321,12 +297,7 @@ class StudentAgent(Agent):
             win_blocks = adv_pos_score
         else:
             player_win = -1  # Tie
-        if player_win >= 0:
-            logging.info(
-                f"Game ends! Player wins having control over {win_blocks} blocks!"
-            )
-        else:
-            logging.info("Game ends! It is a Tie!")
+        
         return True, my_pos_score - adv_pos_score
     
     def state_of_game(chess_board):
@@ -351,23 +322,20 @@ class StudentAgent(Agent):
 
     def eval_function(self,curr_move, chess_board, my_pos, adv_pos, max_step):
         #where we return the complete heuristic, other defined heuristics should be called here and added to the return value
-        available_move_number = self.get_available_move_number(chess_board, my_pos, adv_pos, max_step)
+        available_move_number = self.get_number_of_reachable_tiles(chess_board, my_pos, adv_pos, max_step)/5
         aggression_heuristic = self.is_aggressive_move(curr_move, adv_pos)
-        distance_heuristic = self.distance_between_agents(my_pos, adv_pos)
+        distance_heuristic = self.distance_between_agents(my_pos, adv_pos)/5
 
         return available_move_number + aggression_heuristic + distance_heuristic
 
-    def get_available_move_number(self, chess_board, my_pos, adv_pos, max_step):
+    def get_number_of_reachable_tiles(self, chess_board, my_pos, adv_pos, max_step):
         #returns the number of available complete moves, not the number of available tiles
         allowed_moves = {}
 
         self.get_successors(allowed_moves, 0, chess_board, my_pos, adv_pos, max_step, -1)
-        number_of_moves = 0
+        return len(list(allowed_moves.keys()))
 
-        for move in allowed_moves:
-            number_of_moves+=len(allowed_moves[move])
-        
-        return number_of_moves
+    
     
     def is_aggressive_move (self, my_move, adv_pos):
         my_r, my_c, my_dir = my_move
