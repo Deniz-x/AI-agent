@@ -7,6 +7,7 @@ from copy import deepcopy
 import time
 import heapq
 import logging
+import random
 
 
 @register_agent("student_agent")
@@ -48,19 +49,35 @@ class StudentAgent(Agent):
         # so far when it nears 2 seconds.
         start_time = time.time()
 
+        #allowed_moves = {}
+       # self.get_successors(allowed_moves, 0,chess_board,my_pos, adv_pos, max_step, -1)
+        #print(allowed_moves.keys())
+
+        #if len(list(allowed_moves.keys())) == 0:
+         #   r,c = my_pos
+         #   dir = random.randint(0, 3)
+         #   return (r,c), dir
+        #allowed_pos = list(allowed_moves.keys())[0]
+        #r,c = allowed_pos
+        #move = r,c, allowed_moves[allowed_pos][0]
+        
+        #print("get_successor took ", time_taken_get_successpr, "seconds.")
+
+    
         alpha, move = self.alpha_beta(my_pos, adv_pos, chess_board, max_step,)
         next_r,next_c, next_dir = move
 
         if(alpha>=1000):
             print("found winning move")
 
-        print(f"chosen move has alpha = {alpha}")
+        #print(f"chosen move has alpha = {alpha}")
+        #print(move)
         time_taken = time.time() - start_time
         
-        print("My AI's turn took ", time_taken, "seconds.")
+        #print("My AI's turn took ", time_taken, "seconds.")
 
         # dummy return
-        return (next_r, next_c), next_dir
+        return (next_r,next_c), next_dir
         #next_position, dir
     
     #my_pos, self.dir_map["u"]
@@ -128,17 +145,19 @@ class StudentAgent(Agent):
         # CUTOFF
         is_cutoff, score = self.cutoff(curr_move, adv_move, chess_board, max_step, curr_depth, max_depth, True)
         if is_cutoff:
-            if curr_depth==0:
-                print(f"returning score in first layer= {score}")
-            return score, curr_move
+            #if curr_depth==0:
+            #    print(f"returning score in first layer= {score}")
+            return score, None
         
-        curr_depth += 1
+        eval = float('-inf')
+        new_alpha = alpha
 
         allowed_moves = {}
         before_get_successor_time = time.time()
         r,c,dir = curr_move
         adv_r, adv_c, d = adv_move
         self.get_successors(allowed_moves, 0,chess_board,(r,c), (adv_r,adv_c), max_step, -1)
+        print(allowed_moves.keys())
         after_get_successor_time = time.time()
         time_taken_get_successpr = after_get_successor_time - before_get_successor_time
         
@@ -155,26 +174,35 @@ class StudentAgent(Agent):
             copied_chess_board = deepcopy(chess_board)
             self.set_barrier(successor, copied_chess_board)
 
-            min_return, new_move= self.alpha_beta_min(adv_move, successor, copied_chess_board, alpha, beta, max_step, curr_depth, max_depth)
+            min_return, new_move= self.alpha_beta_min(adv_move, successor, copied_chess_board, new_alpha, beta, max_step, curr_depth+1, max_depth)
             move_alpha_dict[successor] = min_return
-            alpha = max(alpha, min_return)
+            #alpha = max(alpha, min_return)
 
-            if alpha >= beta:
+            #rewrite this as eval = max(min_return, eval)
+            if min_return > eval:
+                eval = min_return
+
+            if eval >= beta:
                 #print("pruned")
-                if curr_depth==1:
-                    print(f"returning score in first layer= {beta}")
-                return beta, successor
+                ##if curr_depth==1:
+                 #   print(f"returning score in first layer= {beta}")
+                return eval, successor
+            
+            new_alpha = eval if eval > alpha else new_alpha
 
-        move_of_the_winning_alpha = curr_move
+        #move_of_the_winning_alpha = curr_move
         for move in move_alpha_dict:
-            if (move_alpha_dict[move] == alpha):
+            if (move_alpha_dict[move] == eval):
                 move_of_the_winning_alpha = move
+                return eval, move_of_the_winning_alpha
+            
+        return(eval, None)
 
         #print("Returning from Max node with alpha =", alpha)
         #print("Returning from Max node with move =", move_of_the_winning_alpha)
-        if curr_depth==1:
-            print(f"returning score in first layer= {alpha}")
-        return alpha, move_of_the_winning_alpha
+        #if curr_depth==1:
+        #    print(f"returning score in first layer= {alpha}")
+        #return alpha, move_of_the_winning_alpha
 
 
     def alpha_beta_min(self, curr_move, adv_move, chess_board, alpha, beta, max_step, curr_depth, max_depth):
@@ -187,15 +215,16 @@ class StudentAgent(Agent):
         # CUTOFF
         is_cutoff, score = self.cutoff(adv_move, curr_move, chess_board, max_step, curr_depth, max_depth, False)
         if is_cutoff:
-            return score, curr_move
-
-
-        curr_depth += 1
+            return score, None
+        
+        eval = float('inf')
+        new_beta = beta
 
         allowed_moves = {}
         r,c,dir = curr_move
         adv_r, adv_c, d = adv_move
         self.get_successors(allowed_moves, 0,chess_board,(r,c), (adv_r,adv_c), max_step, -1)
+        print(allowed_moves.keys())
         allowed_moves_list = self.dict_to_heap(allowed_moves,curr_move, adv_move, chess_board, max_step, False)
 
         move_beta_dict = {}
@@ -207,22 +236,25 @@ class StudentAgent(Agent):
             copied_chess_board = deepcopy(chess_board)
             self.set_barrier(successor, copied_chess_board)
 
-            new_beta, new_move = self.alpha_beta_max(adv_move, successor, chess_board, alpha, beta, max_step, curr_depth, max_depth)
+            max_return, new_move = self.alpha_beta_max(adv_move, successor, chess_board, alpha, new_beta, max_step, curr_depth+1, max_depth)
             move_beta_dict[successor] = new_beta
-            beta = min(beta, new_beta)
+            #beta = min(beta, new_beta)
 
-            if alpha >= beta:
+            if max_return < eval:
+                eval= max_return
+
+            if alpha >= eval:
                 #print("pruned")
-                return alpha, successor
+                return eval, successor
+            
+            new_beta = eval if eval < new_beta else new_beta
         
-        move_of_the_winning_beta = curr_move
-        for move in move_beta_dict:
-            if (move_beta_dict[move] == alpha):
-                move_of_the_winning_beta = move
+            
+        return(eval, None)
             
         #print("Returning from Min node with alpha =", alpha)
         #print("Returning from Min node with move =", move_of_the_winning_beta)
-        return beta, move_of_the_winning_beta
+        #return beta, move_of_the_winning_beta
     
     def cutoff(self,curr_move, adv_move, chess_board, max_step, curr_depth, max_depth, is_max):
         #returns a boolean that indicates whether we're at a cutoff and a float indicating our score or the eval function's result
@@ -238,7 +270,7 @@ class StudentAgent(Agent):
             #print(score)
             if score == 0 :
                 #tie
-                return True, self.eval_function(curr_move, adv_move, chess_board, max_step, is_max)
+                return True, 0
             return True, score*100
         
         elif curr_depth == max_depth:
@@ -343,7 +375,8 @@ class StudentAgent(Agent):
         #if (not is_max):
         #    return available_move_number
         #return -available_move_number
-        return available_move_number + aggression_heuristic +winning_heuristic - (op_available_move_number+op_aggression_heuristic + op_winning_heuristic)
+        return available_move_number + aggression_heuristic +winning_heuristic - (op_available_move_number+op_aggression_heuristic)
+    
 
     def get_number_of_reachable_tiles(self, chess_board, my_pos, adv_pos, max_step, is_max):
         #returns the number of available complete moves, not the number of available tiles
@@ -377,7 +410,7 @@ class StudentAgent(Agent):
     
     def winning_heuristic(self, my_pos, adv_pos, board, max_step):
         #if the adversary has three sides blocked with walls and if we're able to move there we should trap it
-        # Build a list of the moves we can make
+        
         adv_r, adv_c = adv_pos
         allowed_dirs = [ d                                
             for d in range(0,4)                           # 4 moves possible
