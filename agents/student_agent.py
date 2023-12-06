@@ -98,7 +98,7 @@ class StudentAgent(Agent):
         timer.start()
 
         try:
-            while depth<10:
+            while depth<15:
                 timer.check_timeout()
                 # Call alpha-beta search with the current depth
                 alpha, current_best_move = self.alpha_beta(my_pos, adv_pos, chess_board, max_step, timer, depth)
