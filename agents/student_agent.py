@@ -46,60 +46,53 @@ class StudentAgent(Agent):
 
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
-        """
-        Implement the step function of your agent here.
-        You can use the following variables to access the chess board:
-        - chess_board: a numpy array of shape (x_max, y_max, 4)
-        - my_pos: a tuple of (x, y)
-        - adv_pos: a tuple of (x, y)
-        - max_step: an integer
-
-        You should return a tuple of ((x, y), dir),
-        where (x, y) is the next position of your agent and dir is the direction of the wall
-        you want to put on.
-
-        Please check the sample implementation in agents/random_agent.py or agents/human_agent.py for more details.
-        """
-
-        # Some simple code to help you with timing. Consider checking 
-        # time_taken during your search and breaking with the best answer
-        # so far when it nears 2 seconds.
+        
         start_time = time.time()
 
-    
-        move = self.iterative_deepening(my_pos, adv_pos, chess_board, max_step)
+        # Create a timer with the specified max_time
+        # 1.9 max to give some leeway since timer might exceed the max_time set in between the time cheks
+        timer = Timer(1.9)
+        timer.start()
+
+        #check if there is an obvious move to trap the opponent
+        winning_move = self.get_winning_move(chess_board, my_pos, adv_pos, max_step)
+        if(winning_move != None):
+            r,c,dir = winning_move
+            time_taken = time.time() - start_time
+            print("My AI's turn took ", time_taken, "seconds.")
+            return (r,c), dir
+        
+        timer.check_timeout()
+
+        #if not, go into the iterative deepening algorithm
+        move = self.iterative_deepening(my_pos, adv_pos, chess_board, max_step, timer)
         next_r,next_c, next_dir = move
 
-        #print(f"chosen move has alpha = {alpha}")
-        #print(move)
         time_taken = time.time() - start_time
         
         print("My AI's turn took ", time_taken, "seconds.")
 
-        # dummy return
         return (next_r,next_c), next_dir
-        #next_position, dir
+
     
-    def iterative_deepening(self, my_pos, adv_pos, chess_board, max_step):
+    def iterative_deepening(self, my_pos, adv_pos, chess_board, max_step, timer):
 
         r,c = my_pos
 
         allowed_dirs = [ d                                
-            for d in range(0,4)                           # 4 moves possible
-            if not chess_board[r,c,d] and                 # chess_board True means wall
-            not adv_pos == (r+self.moves[d][0],c+self.moves[d][1])] # cannot move through Adversary
+            for d in range(0,4)                           
+            if not chess_board[r,c,d] and                 
+            not adv_pos == (r+self.moves[d][0],c+self.moves[d][1])] 
         
         #initialize best_move with some basic move
         best_move = r,c, allowed_dirs[0]
         depth = 1
 
-        # Create a timer with the specified max_time
-        timer = Timer(1.9)
-        timer.start()
-
         try:
             while depth<15:
+                #check if time ran out before doing another iteration of alpha beta
                 timer.check_timeout()
+
                 # Call alpha-beta search with the current depth
                 alpha, current_best_move = self.alpha_beta(my_pos, adv_pos, chess_board, max_step, timer, depth)
         
@@ -115,6 +108,37 @@ class StudentAgent(Agent):
 
         print(f"max depth you've reached is: {depth}")
         return best_move
+    
+    def get_winning_move(self, chess_board, my_pos, adv_pos, max_step):
+
+        adv_r, adv_c = adv_pos
+
+        #check the number of open sides without considering my_pos
+        allowed_dirs = [ d                                
+            for d in range(0,4)                           
+            if not chess_board[adv_r,adv_c,d]                
+            ]
+
+        #since we didn't consider my_pos, if there is only one open side, we can trap the opponent 
+        if (len(allowed_dirs)==1) and self.distance_between_agents(my_pos, adv_pos)<=max_step+1:
+            dir = allowed_dirs[0]
+            winning_move = adv_r+self.moves[dir][0],adv_c+self.moves[dir][1], self.opposites[dir]
+
+            #If I'm already in the winning position, then return winning_move
+            if my_pos == (adv_r+self.moves[dir][0],adv_c+self.moves[dir][1]):
+                print(f"found winning move! {winning_move}")
+                return winning_move
+            
+            #else, see if I can get to the winning tile, if so we have found our winning move!
+            allowed_moves= {}
+            self.get_successors(allowed_moves, 0,chess_board,my_pos, adv_pos, max_step, -1)
+            print(list(allowed_moves.keys()))
+            if (adv_r+self.moves[dir][0],adv_c+self.moves[dir][1]) in list(allowed_moves.keys()):
+                print(f"found winning move! {winning_move}")
+                return winning_move
+        
+        return None
+
 
     #self.dir_map["u"]
     def get_successors(self, allowed_moves, i,chess_board,my_pos, adv_pos, max_step, prev_dir):
@@ -440,7 +464,7 @@ class StudentAgent(Agent):
         my_r, my_c = my_pos
         adv_r, adv_c = adv_pos
 
-        return 10/(abs(my_r - adv_r) + abs(my_c - adv_c))
+        return (abs(my_r - adv_r) + abs(my_c - adv_c))
     
 
     
@@ -458,7 +482,7 @@ class StudentAgent(Agent):
 
             #if I'm not next to the adversary
 
-            if self.distance_between_agents(my_pos, adv_pos)<max_step:
+            if self.distance_between_agents(my_pos, adv_pos)<=max_step:
                 dir = allowed_dirs[0]
                 if my_pos == (adv_r+self.moves[dir][0],adv_c+self.moves[dir][1]):
                     return 100
@@ -473,8 +497,7 @@ class StudentAgent(Agent):
                 r,c = pos
                 eval = self.eval_function((r,c,dir), adv_move, chess_board, max_step, is_max)
                 moves_with_heuristic.append( (eval, (r,c,dir)))
-        #print(len(chess_board))
-        #print(len(chess_board+5))
+
         max_num_of_successors = len(chess_board)+3
         # Use a min heap to keep track of top n moves based on heuristic
         top_n_moves_heap = heapq.nlargest(min(max_num_of_successors, len(moves_with_heuristic)), moves_with_heuristic)
