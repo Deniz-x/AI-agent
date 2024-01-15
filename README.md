@@ -1,5 +1,7 @@
 # Colosseum Survival!
 
+[Project Report](project-report.pdf)
+
 **Project Description & Template** : https://www.overleaf.com/read/vnygbjryrxrt#7b70cb
 
 <p align="center">
